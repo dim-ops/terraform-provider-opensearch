@@ -152,10 +152,24 @@ func TestAccOpensearchDataSourceIndices_crossClusterReplication(t *testing.T) {
 				Config: testAccOpensearchDataSourceIndicesCrossClusterReplicationConfig(leaderSeed, true, false),
 			},
 			{
+				Config:             testAccOpensearchDataSourceIndicesCrossClusterReplicationConfig(leaderSeed, true, true),
+				ResourceName:       "opensearch_cross_cluster_replication.a",
+				ImportState:        true,
+				ImportStateId:      leaderIndexes[0],
+				ImportStatePersist: true,
+			},
+			{
+				Config:             testAccOpensearchDataSourceIndicesCrossClusterReplicationConfig(leaderSeed, true, true),
+				ResourceName:       "opensearch_cross_cluster_replication.b",
+				ImportState:        true,
+				ImportStateId:      leaderIndexes[1],
+				ImportStatePersist: true,
+			},
+			{
 				Config: testAccOpensearchDataSourceIndicesCrossClusterReplicationConfig(leaderSeed, true, true),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("opensearch_cross_cluster_replication.test.0", "status", replicationStatusSyncing),
-					resource.TestCheckResourceAttr("opensearch_cross_cluster_replication.test.1", "status", replicationStatusSyncing),
+					resource.TestCheckResourceAttr("opensearch_cross_cluster_replication.a", "status", replicationStatusSyncing),
+					resource.TestCheckResourceAttr("opensearch_cross_cluster_replication.b", "status", replicationStatusSyncing),
 				),
 			},
 			{
@@ -221,25 +235,16 @@ resource "opensearch_cross_cluster_replication_rule" "test" {
 
 	if withReplications {
 		config += `
-# A list and count rather than a map and for_each, which the SDK test framework
-# does not support: each.key is the position in the list.
-locals {
-  followers = [for index in data.opensearch_indices.test.indices : index if index.leader_alias != ""]
+resource "opensearch_cross_cluster_replication" "a" {
+  follower_index = "terraform-test-ccr-auto-a"
+  leader_alias   = opensearch_cross_cluster_connection.test.name
+  leader_index   = "terraform-test-ccr-auto-a"
 }
 
-import {
-  for_each = local.followers
-
-  to = opensearch_cross_cluster_replication.test[each.key]
-  id = each.value.name
-}
-
-resource "opensearch_cross_cluster_replication" "test" {
-  count = length(local.followers)
-
-  follower_index = local.followers[count.index].name
-  leader_alias   = local.followers[count.index].leader_alias
-  leader_index   = local.followers[count.index].leader_index
+resource "opensearch_cross_cluster_replication" "b" {
+  follower_index = "terraform-test-ccr-auto-b"
+  leader_alias   = opensearch_cross_cluster_connection.test.name
+  leader_index   = "terraform-test-ccr-auto-b"
 }
 `
 	}
